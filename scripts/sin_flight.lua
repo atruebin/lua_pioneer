@@ -56,6 +56,9 @@ local sinH = 0.6
 local sinNumPerT = 20
 -- Направление синусоиды (Y -- вперёд (по-умолчанию), 'X','x' -- вправо)
 local sinDir = 'Y'
+-- Количество циклов
+local sinCyclesNum = 3
+
 ----------------------------
 -- Шаг точек вдоль синусоиды
 local sinStep = sinT/sinNumPerT
@@ -87,22 +90,29 @@ for i = sinNum, 0, -1 do
 end
 
 -- Счетчик точек
-local curr_point = 1
+local currPoint = 1
+-- Счетчик циклов
+local currCycle = 1
 
 -- Функция, изменяющая цвет светодиодов и выполняющая полет к следующей точке
 local function nextPoint()
     -- Текущий цвет. % - остаток от деления, # - размер таблицы. Такая конструкция использована,
     -- чтобы цвета продолжали меняться, даже если точек больше, чем цветов в таблице
-    curr_color = ((curr_point - 1) % (#colors - 2)) + 1
+    currColor = ((currPoint - 1) % (#colors - 2)) + 1
     -- Изменение цвета светодиодов                                                         
-    changeColor(colors[curr_color])
+    changeColor(colors[currColor])
     -- Полет к текущей точке, если её номер не больше количества заданных точек
-    if(curr_point <= #points) then
+    if (currPoint <= #points) and (currCycle <= sinCyclesNum) then
         -- Команда полета к точке в системе позиционирования
-        ap.goToLocalPoint(unpack(points[curr_point]))
+        ap.goToLocalPoint(unpack(points[currPoint]))
         -- Инкрементация переменной текущей точки
-        curr_point = curr_point + 1
-    -- Посадка, если номер текущей точки больше количества заданных точек
+        currPoint = currPoint + 1
+    -- Переход к следующему циклу, если в текущем цикле пройдены все точки
+    elseif (currCycle <= sinCyclesNum) then
+    	currPoint = 1
+    	currCycle = currCycle + 1
+    	nextPoint()
+    -- Посадка, если номер текущего цикла больше заданного количества циклов
     else
         Timer.callLater(1, function()
             -- Команда на посадку
@@ -114,8 +124,8 @@ end
 -- Функция обработки событий, автоматически вызывается автопилотом
 function callback(event)
     -- Когда коптер приближается к точке, переходим к следующей
-    if(event == Ev.POINT_DECELERATION) then
-        if curr_point == 1 then
+    if (event == Ev.POINT_DECELERATION or event == Ev.TAKEOFF_COMPLETE) then
+        if currPoint == 1 then
         	Timer.callLater(1, function() nextPoint() end)
         else
         	nextPoint()
